@@ -1,7 +1,7 @@
 import argparse
-import csv
 import numpy as np
 
+from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
@@ -10,51 +10,24 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Regresión con scikit-learn (CLI)")
-    p.add_argument("--data", required=True, help="Ruta al CSV")
-    p.add_argument("--target-index", type=int, default=-1, help="Índice de la columna objetivo (default: -1, última).")
-    p.add_argument("--header", action="store_true", help="Indica si el CSV tiene encabezado (default: False).")
+    p = argparse.ArgumentParser(description="Regresión con California Housing (scikit-learn)")
     p.add_argument("--test-size", type=float, default=0.2, help="Proporción del conjunto de prueba (default: 0.2).")
     p.add_argument("--seed", type=int, default=42, help="Semilla para el split (default: 42).")
     p.add_argument("--standardize", action="store_true", help="Estandarizar X con StandardScaler (default: False).")
     p.add_argument("--model", choices=["linear", "ridge", "lasso"], default="linear",
                    help="Modelo a usar (default: linear).")
     p.add_argument("--alpha", type=float, default=1.0, help="Alpha para Ridge/Lasso (default: 1.0).")
-    p.add_argument("--predict", type=str, default=None, help='Vector de features para predecir, ej: "120,3,2".')
+    p.add_argument("--predict", type=str, default=None, help='Vector de features para predecir, ej: "8.3,41,6,...".')
     return p.parse_args()
-
-
-def read_csv(path: str, header: bool, target_idx: int):
-    with open(path, "r", newline="", encoding="utf-8") as f:
-        rows = list(csv.reader(f))
-    if not rows:
-        raise ValueError("CSV vacío.")
-    start = 1 if header else 0
-    if header:
-        ncols = len(rows[0])
-    else:
-        ncols = len(rows[0])
-    if target_idx < 0:
-        target_idx = ncols + target_idx
-
-    data = []
-    for r in rows[start:]:
-        if len(r) != ncols:
-            raise ValueError("Filas con distinto número de columnas.")
-        data.append(r)
-    data = np.array(data, dtype=float)
-    y = data[:, target_idx]
-    X = np.delete(data, target_idx, axis=1)
-    return X, y
 
 
 def build_pipeline(model_name: str, standardize: bool, alpha: float):
     if model_name == "linear":
         model = LinearRegression()
     elif model_name == "ridge":
-        model = Ridge(alpha=alpha, random_state=None)
+        model = Ridge(alpha=alpha)
     else:
-        model = Lasso(alpha=alpha, random_state=None, max_iter=10000)
+        model = Lasso(alpha=alpha, max_iter=10000)
 
     steps = []
     if standardize:
@@ -66,7 +39,10 @@ def build_pipeline(model_name: str, standardize: bool, alpha: float):
 def main():
     args = parse_args()
 
-    X, y = read_csv(args.data, header=args.header, target_idx=args.target_index)
+    # Cargar California Housing
+    housing = fetch_california_housing()
+    X, y = housing.data, housing.target
+    feature_names = housing.feature_names
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=args.test_size, random_state=args.seed
@@ -87,6 +63,7 @@ def main():
         vec = np.array([float(v.strip()) for v in args.predict.split(",")], dtype=float).reshape(1, -1)
         y_one = pipe.predict(vec)[0]
         print(f"Predicción para [{args.predict}] -> {y_one:.6f}")
+        print("Orden de features:", feature_names)
 
 
 if __name__ == "__main__":
